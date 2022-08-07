@@ -1,4 +1,5 @@
-# Выпускной проект OTUS "Разработчик SPARK"
+# Выпускной проект OTUS "Spark Developer"
+https://otus.ru/lessons/spark/
 
 Генератор событий поставляет в Kafka статистику посещения сайта.
 
