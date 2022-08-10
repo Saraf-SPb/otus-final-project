@@ -1,9 +1,10 @@
 package stream
 
+import com.typesafe.config.ConfigFactory
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.concurrent.duration.DurationInt
 
@@ -14,7 +15,13 @@ object SpeedLayer extends App {
     .master("local[2]")
     .getOrCreate()
 
-  val schemaSiteStat = StructType(
+  val configFactory = ConfigFactory.load()
+  val outputParquetPath = configFactory.getString("config.speed_parquet_path")
+  val outputStreamingCheckpoint = configFactory.getString("config.streaming_checkpoint")
+  val windowDuration = configFactory.getInt("config.window_duration").toString + " seconds"
+  val triggerProcessingTime = configFactory.getInt("config.trigger_processing_time").toString + " seconds"
+
+  var schemaSiteStat: StructType = StructType(
     Array(
       StructField("timestamp", StringType),
       StructField("page", StringType),
@@ -27,8 +34,8 @@ object SpeedLayer extends App {
   def readFromKafka(): DataFrame =
     spark.readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:29092")
-      .option("subscribe", "input")
+      .option("kafka.bootstrap.servers", configFactory.getString("config.kafka_bootstrap_servers"))
+      .option("subscribe", configFactory.getString("config.topic"))
       .load()
 
   def transform(in: DataFrame): DataFrame =
@@ -45,50 +52,38 @@ object SpeedLayer extends App {
       .select(
         date_format(to_timestamp(col("timestamp"), "dd-MM-yyyy HH:mm:ss:SSS"), "HH:mm:ss:SSS")
           .as("time"),
-        col("timestamp"),
         col("page"),
         col("userId"),
         col("duration"),
         col("trafficSource")
       )
 
-  case class Record(timestampType: TimestampType, pageType: String)
-
   import spark.implicits._
-
-  def transformToCaseClass(in: DataFrame): Dataset[String] = {
-    in
-      .select(expr("cast(value as string) as actualValue"))
-      .as[String]
-  }
-  //      .map{ value => }
 
   def writeDfToParquet(in: DataFrame): Unit = {
     in
       .select("page", "trafficSource")
       .withColumn("timestamp", current_timestamp())
-      .withWatermark("timestamp", "10 seconds")
-      .groupBy(window($"timestamp", "10 seconds"),
+      .withWatermark("timestamp", windowDuration)
+      .groupBy(window($"timestamp", windowDuration),
         col("page"), col("trafficSource"))
       .agg(count("*").alias("count"))
       .drop("timestamp")
       .writeStream
       .format("parquet")
-      .option("path", "out/final.parquet")
-//      .option("checkpointLocation", "src/main/resources/checkpoint")
-      .option("checkpointLocation", "tmp/streaming-checkpoint")
+      .option("path", outputParquetPath)
+      .option("checkpointLocation", outputStreamingCheckpoint)
       .outputMode("append")
-      .trigger(Trigger.ProcessingTime(10.seconds))
+      .trigger(Trigger.ProcessingTime(triggerProcessingTime))
       .start()
-//      .awaitTermination()
   }
 
   def writeDfToConsole(in: DataFrame): Unit =
     in
       .select("page", "trafficSource")
       .withColumn("timestamp", current_timestamp())
-      .withWatermark("timestamp", "10 seconds")
-      .groupBy(window($"timestamp", "10 seconds"),
+      .withWatermark("timestamp", windowDuration)
+      .groupBy(window($"timestamp", windowDuration),
         col("page"), col("trafficSource"))
       .agg(count("*").alias("count"))
       .drop("timestamp")
@@ -96,9 +91,8 @@ object SpeedLayer extends App {
       .format("console")
       .option("truncate", false)
       .outputMode("update")
-      .trigger(Trigger.ProcessingTime(10.seconds))
+      .trigger(Trigger.ProcessingTime(triggerProcessingTime))
       .start()
-//      .awaitTermination()
 
   def writeDfToConsoleRAW(in: DataFrame): Unit =
     in
