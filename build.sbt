@@ -68,3 +68,5 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-parser" % "0.11.1",
   "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.12.0"
 )
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "3.2.1"

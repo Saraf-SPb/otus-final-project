@@ -6,8 +6,6 @@ import org.apache.spark.sql.streaming.Trigger
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import scala.concurrent.duration.DurationInt
-
 object SpeedLayer extends App {
   val spark = SparkSession
     .builder()
@@ -16,10 +14,13 @@ object SpeedLayer extends App {
     .getOrCreate()
 
   val configFactory = ConfigFactory.load()
-  val outputParquetPath = configFactory.getString("config.speed_parquet_path")
-  val outputStreamingCheckpoint = configFactory.getString("config.streaming_checkpoint")
+  val outputParquetPathFromConfig = configFactory.getString("config.speed_parquet_path")
+  val outputStreamingCheckpointFromConfig = configFactory.getString("config.streaming_checkpoint")
   val windowDuration = configFactory.getInt("config.window_duration").toString + " seconds"
   val triggerProcessingTime = configFactory.getInt("config.trigger_processing_time").toString + " seconds"
+
+  val outputParquetPath = "file:///" + System.getProperty("user.dir") + "/" + outputParquetPathFromConfig
+  val outputStreamingCheckpoint = "file:///" + System.getProperty("user.dir") + "/" + outputStreamingCheckpointFromConfig
 
   var schemaSiteStat: StructType = StructType(
     Array(
@@ -92,20 +93,6 @@ object SpeedLayer extends App {
       .option("truncate", false)
       .outputMode("update")
       .trigger(Trigger.ProcessingTime(triggerProcessingTime))
-      .start()
-
-  def writeDfToConsoleRAW(in: DataFrame): Unit =
-    in
-      .withColumn("timestamp", to_timestamp(col("timestamp"), "dd-MM-yyyy HH:mm:ss:SSS"))
-      .withWatermark("timestamp", "10 seconds")
-//      .groupBy(window($"timestamp", "10 seconds"),
-//        col("page"), col("trafficSource"))
-//      .agg(count("*").alias("count"))
-      .writeStream
-      .format("console")
-      .option("truncate", false)
-      .outputMode("append")
-      .trigger(Trigger.ProcessingTime(10.seconds))
       .start()
 
   val frame       = readFromKafka()
