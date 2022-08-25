@@ -13,11 +13,11 @@ import java.time.format.DateTimeFormatter
 
 object BatchLayer extends App {
 
-  val configFactory = ConfigFactory.load()
-  val inputParquetPath = configFactory.getString("config.speed_parquet_path")
-  val outputParquetPath = configFactory.getString("config.batch_parquet_path")
+  val configFactory         = ConfigFactory.load()
+  val inputParquetPath      = configFactory.getString("config.speed_parquet_path")
+  val outputParquetPath     = configFactory.getString("config.batch_parquet_path")
   val outputBatchCheckpoint = configFactory.getString("config.batch_checkpoint")
-  val baseHDFSPath = configFactory.getString("config.base_hdfs_path")
+  val baseHDFSPath          = configFactory.getString("config.base_hdfs_path")
 
   val conf               = new Configuration()
   val CoreSitePath       = new Path("core-site.xml")
@@ -39,6 +39,8 @@ object BatchLayer extends App {
   val siteStatParquet =
     spark.read.load("file:///" + System.getProperty("user.dir") + "/" + inputParquetPath)
 
+  siteStatParquet.localCheckpoint()
+
   import spark.implicits._
 
   val inputDF = siteStatParquet.as[SchemaPageTrafficSourceStat]
@@ -47,11 +49,18 @@ object BatchLayer extends App {
     .groupBy(col("page"), col("trafficSource"))
     .agg(sum("count").alias("sum_count"))
 
-  pageTrafficSourceStat.orderBy(desc("sum_count")).show(30)
-
   private val outputPath: String = outputHDFSPath + "/" +
     LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-  pageTrafficSourceStat.write
+
+  pageTrafficSourceStat
+    .withColumn("date_today", lit(outputPath))
+    .orderBy(desc("sum_count"))
+    .show(30)
+
+  pageTrafficSourceStat
+    .coalesce(1)
+    .write
+    .partitionBy("date_today")
     .format("parquet")
     .option("checkpointLocation", outputBatchCheckpoint)
     .mode(SaveMode.Overwrite)

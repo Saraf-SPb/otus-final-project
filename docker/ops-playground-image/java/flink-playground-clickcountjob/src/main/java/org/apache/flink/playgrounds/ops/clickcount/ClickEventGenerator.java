@@ -25,6 +25,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 
+import java.sql.Timestamp;
 import java.util.*;
 
 import static org.apache.flink.playgrounds.ops.clickcount.ClickEventCount.WINDOW_SIZE;
@@ -107,6 +108,7 @@ public class ClickEventGenerator {
         private Date nextTimestamp(String page) {
             long nextTimestamp = nextTimestampPerKey.getOrDefault(page, 0L);
             nextTimestampPerKey.put(page, nextTimestamp + WINDOW_SIZE.toMilliseconds() / EVENTS_PER_WINDOW);
+//            long nextTimestamp = System.currentTimeMillis();
             return new Date(nextTimestamp);
         }
 
@@ -114,11 +116,6 @@ public class ClickEventGenerator {
             String nextPage = pages.get(nextPageIndex);
             Random rnd = new Random();
             nextPageIndex = rnd.nextInt(pages.size());
-//            if (nextPageIndex == pages.size() - 1) {
-//                nextPageIndex = 0;
-//            } else {
-//                nextPageIndex++;
-//            }
             return nextPage;
         }
 
@@ -138,11 +135,6 @@ public class ClickEventGenerator {
             String nextTrafficSource = trafficSource.get(nextTrafficSourceIndex);
             Random rnd = new Random();
             nextTrafficSourceIndex = rnd.nextInt(trafficSource.size());
-//            if (nextTrafficSourceIndex == trafficSource.size() - 1) {
-//                nextTrafficSourceIndex = 0;
-//            } else {
-//                nextTrafficSourceIndex++;
-//            }
             return nextTrafficSource;
         }
 
