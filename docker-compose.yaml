@@ -48,14 +48,14 @@ services:
       environment:
         KAFKA_BROKER_ID: ignored
         KAFKA_ZOOKEEPER_CONNECT: ignored
-#  cassandra:
-#    image: cassandra:3
-#    container_name: cassandra
-#    ports:
-#      - "7000:7000"
-#      - "9042:9042"
-#    environment:
-#      - "CASSANDRA_CLUSTER_NAME=OUR_DOCKERIZED_CASSANDRA_SINGLE_NODE_CLUSTER"
+  cassandra:
+    image: cassandra:3
+    container_name: cassandra
+    ports:
+      - "7000:7000"
+      - "9042:9042"
+    environment:
+      - "CASSANDRA_CLUSTER_NAME=OUR_DOCKERIZED_CASSANDRA_SINGLE_NODE_CLUSTER"
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode

@@ -13,16 +13,16 @@ import java.time.format.DateTimeFormatter
 
 object BatchLayer extends App {
 
-  val configFactory = ConfigFactory.load()
-  val inputParquetPath = configFactory.getString("config.speed_parquet_path")
-  val outputParquetPath = configFactory.getString("config.batch_parquet_path")
+  val configFactory         = ConfigFactory.load()
+  val inputParquetPath      = configFactory.getString("config.speed_parquet_path")
+  val outputParquetPath     = configFactory.getString("config.batch_parquet_path")
   val outputBatchCheckpoint = configFactory.getString("config.batch_checkpoint")
-  val baseHDFSPath = configFactory.getString("config.base_hdfs_path")
+  val baseHDFSPath          = configFactory.getString("config.base_hdfs_path")
 
   val conf               = new Configuration()
   val CoreSitePath       = new Path("core-site.xml")
   val HDFSSitePath       = new Path("hdfs-site.xml")
-  val outputHDFSPath     = new Path("/batch")
+  val outputHDFSPath     = new Path("/batch").toString
   private val fileSystem = FileSystem.get(new URI(baseHDFSPath), conf)
 
   conf.addResource(CoreSitePath)
@@ -39,6 +39,8 @@ object BatchLayer extends App {
   val siteStatParquet =
     spark.read.load("file:///" + System.getProperty("user.dir") + "/" + inputParquetPath)
 
+  siteStatParquet.localCheckpoint()
+
   import spark.implicits._
 
   val inputDF = siteStatParquet.as[SchemaPageTrafficSourceStat]
@@ -47,15 +49,23 @@ object BatchLayer extends App {
     .groupBy(col("page"), col("trafficSource"))
     .agg(sum("count").alias("sum_count"))
 
-  pageTrafficSourceStat.orderBy(desc("sum_count")).show(30)
+  private val report_date = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
 
-  private val outputPath: String = outputHDFSPath + "/" +
-    LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-  pageTrafficSourceStat.write
-    .format("parquet")
+  val pageTrafficSourceStatResult =
+    pageTrafficSourceStat
+      .withColumn("report_date", lit(report_date))
+      .orderBy(desc("sum_count"))
+
+  pageTrafficSourceStatResult.show(30)
+
+  pageTrafficSourceStatResult
+    .coalesce(1)
+    .write
+    .partitionBy("report_date")
+    .format("orc")
     .option("checkpointLocation", outputBatchCheckpoint)
     .mode(SaveMode.Overwrite)
-    .save(outputPath)
+    .save(outputHDFSPath)
 
   def createFolder(folderPath: String): Unit = {
     val path = new Path(folderPath)
