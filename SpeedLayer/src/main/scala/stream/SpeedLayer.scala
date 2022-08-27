@@ -1,6 +1,5 @@
 package stream
 
-import com.datastax.oss.driver.api.core.uuid.Uuids
 import com.typesafe.config.ConfigFactory
 import org.apache.spark.sql.cassandra._
 import org.apache.spark.sql.functions._

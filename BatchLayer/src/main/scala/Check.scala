@@ -23,9 +23,14 @@ object Check extends App {
     .getOrCreate()
 
 //  val siteStatParquet =
-//    spark.read.load(s"$outputHDFSPath/2022-08-12").orderBy(desc("sum_count"))
-//
+//    spark.read.load(s"$outputHDFSPath/report_date=2022-08-27").orderBy(desc("sum_count"))
+
 //  siteStatParquet.show(30)
+
+  val siteStatORC =
+    spark.read.orc(s"$outputHDFSPath/report_date=2022-08-27").orderBy(desc("sum_count"))
+
+  siteStatORC.show(30)
 
   val outputParquetPath =
     "file:///" + System.getProperty("user.dir") + "/" + outputParquetPathFromConfig

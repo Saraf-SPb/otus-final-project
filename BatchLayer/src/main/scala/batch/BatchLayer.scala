@@ -22,7 +22,7 @@ object BatchLayer extends App {
   val conf               = new Configuration()
   val CoreSitePath       = new Path("core-site.xml")
   val HDFSSitePath       = new Path("hdfs-site.xml")
-  val outputHDFSPath     = new Path("/batch")
+  val outputHDFSPath     = new Path("/batch").toString
   private val fileSystem = FileSystem.get(new URI(baseHDFSPath), conf)
 
   conf.addResource(CoreSitePath)
@@ -49,22 +49,23 @@ object BatchLayer extends App {
     .groupBy(col("page"), col("trafficSource"))
     .agg(sum("count").alias("sum_count"))
 
-  private val outputPath: String = outputHDFSPath + "/" +
-    LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+  private val report_date = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
 
-  pageTrafficSourceStat
-    .withColumn("date_today", lit(outputPath))
-    .orderBy(desc("sum_count"))
-    .show(30)
+  val pageTrafficSourceStatResult =
+    pageTrafficSourceStat
+      .withColumn("report_date", lit(report_date))
+      .orderBy(desc("sum_count"))
 
-  pageTrafficSourceStat
+  pageTrafficSourceStatResult.show(30)
+
+  pageTrafficSourceStatResult
     .coalesce(1)
     .write
-    .partitionBy("date_today")
-    .format("parquet")
+    .partitionBy("report_date")
+    .format("orc")
     .option("checkpointLocation", outputBatchCheckpoint)
     .mode(SaveMode.Overwrite)
-    .save(outputPath)
+    .save(outputHDFSPath)
 
   def createFolder(folderPath: String): Unit = {
     val path = new Path(folderPath)

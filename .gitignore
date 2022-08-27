@@ -6,3 +6,11 @@
 /out/
 /.idea/
 /.bsp/
+/SpeedLayer/.bsp/
+/SpeedLayer/.idea/
+/SpeedLayer/target/
+/SpeedLayer/project/target/
+/BatchLayer/.bsp/
+/BatchLayer/.idea/
+/BatchLayer/target/
+/BatchLayer/project/target/
